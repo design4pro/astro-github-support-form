@@ -173,7 +173,9 @@ function requiredEnv(name: string): string {
 }
 
 function normalizePrivateKey(value: string): string {
-  return value.replace(/\\n/g, "\n");
+  return value
+    .replace(/^["']|["']$/g, "")
+    .replace(/\\n/g, "\n");
 }
 
 function formDataToObject(formData: FormData): Record<string, unknown> {
