@@ -6,6 +6,7 @@
   --text: #101828;
   --muted: #667085;
   --line: #d9dee8;
+  --placeholder: #98a2b3;
   --accent: #2563eb;
   --accent-strong: #1d4ed8;
   --accent-soft: #dbeafe;
@@ -137,6 +138,12 @@ textarea {
   font-size: 1rem;
   line-height: 1.4;
   padding: 12px 13px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+  opacity: 1;
 }
 
 textarea {

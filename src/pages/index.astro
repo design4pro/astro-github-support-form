@@ -68,12 +68,24 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
 
             <div class="field">
               <label for="title">Title</label>
-              <input id="title" name="title" type="text" maxlength="120" required value="Calendar export fails" />
+              <input
+                id="title"
+                name="title"
+                type="text"
+                maxlength="120"
+                required
+                placeholder="Calendar export fails"
+              />
             </div>
 
             <div class="field">
               <label for="message">Message</label>
-              <textarea id="message" name="message" required>I clicked Export and the request returned a 500 response. I expected a downloadable ICS file.</textarea>
+              <textarea
+                id="message"
+                name="message"
+                required
+                placeholder="I clicked Export and the request returned a 500 response. I expected a downloadable ICS file."
+              ></textarea>
             </div>
 
             <div class="grid">
@@ -83,7 +95,7 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
               </div>
               <div class="field">
                 <label for="environment">Environment <span class="label">(optional)</span></label>
-                <input id="environment" name="environment" type="text" value="Safari 18, macOS 15" />
+                <input id="environment" name="environment" type="text" placeholder="Safari 18, macOS 15" />
               </div>
             </div>
 
