@@ -1,6 +1,6 @@
 # Astro GitHub Support Form
 
-This is a small Astro SSR example that turns a website feedback form into GitHub Issues through a GitHub App installation token.
+This is a small Astro SSR example that turns a website feedback form into GitHub Issues through a GitHub App installation token. It is configured for Cloudflare Workers.
 
 It is intentionally simple:
 
@@ -28,16 +28,24 @@ Generate a private key in the app settings and copy the app ID.
 
 ```bash
 bun install
-cp .env.example .env
+cp .dev.vars.example .dev.vars
 ```
 
-Fill `.env`:
+Fill `.dev.vars` for local Cloudflare Workers development:
 
 ```bash
 GITHUB_APP_ID=1234567
-GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-GITHUB_OWNER=design4pro
-GITHUB_REPO=astro-github-support-form
+GITHUB_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```
+
+`GITHUB_OWNER` and `GITHUB_REPO` are defined in `wrangler.jsonc` because they are not secrets.
+
+GitHub downloads GitHub App private keys as PKCS#1 PEM files. Cloudflare Workers needs a PKCS#8 PEM for this dependency stack. Convert the downloaded key before putting it in `.dev.vars` or Cloudflare secrets:
+
+```bash
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
+  -in github-app.private-key.pem \
+  -out github-app.private-key.pkcs8.pem
 ```
 
 Then run:
@@ -47,6 +55,25 @@ bun run dev
 ```
 
 Open `http://localhost:4321`, submit the form, and check the Issues tab in this repository.
+
+## Cloudflare Workers deployment
+
+The demo uses `@astrojs/cloudflare` and `wrangler.jsonc`.
+
+Set production secrets in Cloudflare:
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=your-account-id bun x wrangler secret put GITHUB_APP_ID
+CLOUDFLARE_ACCOUNT_ID=your-account-id bun x wrangler secret put GITHUB_PRIVATE_KEY
+```
+
+`GITHUB_OWNER` and `GITHUB_REPO` are public variables in `wrangler.jsonc`.
+
+Deploy:
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=your-account-id bun run deploy
+```
 
 ## API contract
 

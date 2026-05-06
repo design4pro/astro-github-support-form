@@ -8,16 +8,19 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy",
+    "cf:types": "wrangler types",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.7",
-    "@astrojs/node": "^10.0.6",
+    "@astrojs/cloudflare": "^13.3.1",
     "astro": "^6.2.2",
     "octokit": "^5.0.5"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.7",
     "@types/node": "^24.10.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.88.0"
   }
 }

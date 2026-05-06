@@ -1,4 +1,2 @@
-GITHUB_APP_ID=
+GITHUB_APP_ID=1234567
 GITHUB_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-GITHUB_OWNER=design4pro
-GITHUB_REPO=astro-github-support-form

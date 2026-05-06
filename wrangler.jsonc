@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "astro-github-support-form",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "secrets": {
+    "required": ["GITHUB_APP_ID", "GITHUB_PRIVATE_KEY"]
+  },
+  "vars": {
+    "GITHUB_OWNER": "design4pro",
+    "GITHUB_REPO": "astro-github-support-form"
+  }
+}

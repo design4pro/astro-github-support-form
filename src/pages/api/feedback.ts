@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { env as cloudflareEnv } from "cloudflare:workers";
 import { App } from "octokit";
 
 type FeedbackType = "bug" | "feature" | "question";
@@ -168,8 +169,9 @@ function createReferenceId(): string {
 }
 
 function requiredEnv(name: string): string {
-  const metaEnv = import.meta.env as Record<string, string | undefined>;
-  const value = process.env[name]?.trim() || metaEnv[name]?.trim();
+  const workerEnv = cloudflareEnv as Record<string, string | undefined>;
+  const nodeEnv = typeof process !== "undefined" ? process.env[name] : undefined;
+  const value = workerEnv[name]?.trim() || nodeEnv?.trim();
   if (!value) {
     throw new Error(`${name} is not configured.`);
   }
