@@ -22,6 +22,9 @@ const labelsByType: Record<FeedbackType, string[]> = {
   feature: ["feedback", "enhancement"],
   question: ["feedback", "question"]
 };
+const githubApiHeaders = {
+  "X-GitHub-Api-Version": "2022-11-28"
+};
 
 export const POST: APIRoute = async ({ request }) => {
   const referenceId = createReferenceId();
@@ -117,7 +120,8 @@ async function createIssue(input: FeedbackInput, referenceId: string): Promise<v
   const app = new App({ appId, privateKey });
   const { data: installation } = await app.octokit.request("GET /repos/{owner}/{repo}/installation", {
     owner,
-    repo
+    repo,
+    headers: githubApiHeaders
   });
   const octokit = await app.getInstallationOctokit(installation.id);
 
@@ -126,7 +130,8 @@ async function createIssue(input: FeedbackInput, referenceId: string): Promise<v
     repo,
     title: `[${referenceId}] ${input.title}`,
     body: formatIssueBody(input, referenceId),
-    labels: labelsByType[input.type]
+    labels: labelsByType[input.type],
+    headers: githubApiHeaders
   });
 }
 
