@@ -2,6 +2,8 @@
 
 This is a small Astro SSR example that turns a website feedback form into GitHub Issues through a GitHub App installation token. It is configured for Cloudflare Workers.
 
+Live demo: https://astro-github-support-form.design4pro.workers.dev
+
 It is intentionally simple:
 
 - one Astro page with a native HTML form
@@ -107,6 +109,19 @@ Successful response:
 }
 ```
 
+Validation error response:
+
+```json
+{
+  "ok": false,
+  "error": "Invalid feedback payload",
+  "details": ["Message must be between 10 and 4000 characters."],
+  "fieldErrors": {
+    "message": ["Message must be between 10 and 4000 characters."]
+  }
+}
+```
+
 ## Production notes
 
-For a real support system, create issues in a private repository, add rate limiting, add an anti-spam challenge, decide what personal data you store, and document the retention policy in your privacy notice.
+For a real support system, create issues in a private repository, keep Turnstile enabled, add rate limiting, decide what personal data you store, and document the retention policy in your privacy notice.
