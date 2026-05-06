@@ -15,9 +15,16 @@ type FeedbackInput = {
   company?: string;
 };
 
+type FeedbackField = "type" | "title" | "message" | "email" | "consent" | "turnstileToken";
+
+type ValidationIssue = {
+  field: FeedbackField;
+  message: string;
+};
+
 type ValidationResult =
   | { ok: true; input: FeedbackInput }
-  | { ok: false; details: string[] };
+  | { ok: false; details: string[]; fieldErrors: Partial<Record<FeedbackField, string[]>> };
 
 const labelsByType: Record<FeedbackType, string[]> = {
   bug: ["feedback", "bug"],
@@ -33,7 +40,15 @@ export const POST: APIRoute = async ({ request }) => {
   const validation = await readFeedback(request);
 
   if (!validation.ok) {
-    return json({ ok: false, error: "Invalid feedback payload", details: validation.details }, 400);
+    return json(
+      {
+        ok: false,
+        error: "Invalid feedback payload",
+        details: validation.details,
+        fieldErrors: validation.fieldErrors
+      },
+      400
+    );
   }
 
   if (validation.input.company?.trim()) {
@@ -42,7 +57,17 @@ export const POST: APIRoute = async ({ request }) => {
 
   const turnstile = await verifyTurnstile(validation.input.turnstileToken, request);
   if (!turnstile.ok) {
-    return json({ ok: false, error: "Turnstile verification failed" }, 400);
+    return json(
+      {
+        ok: false,
+        error: "Turnstile verification failed",
+        details: ["Complete the Turnstile verification and try again."],
+        fieldErrors: {
+          turnstileToken: ["Complete the Turnstile verification and try again."]
+        }
+      },
+      400
+    );
   }
 
   try {
@@ -65,7 +90,7 @@ async function readFeedback(request: Request): Promise<ValidationResult> {
       payload = formDataToObject(await request.formData());
     }
   } catch {
-    return { ok: false, details: ["Request body could not be parsed."] };
+    return { ok: false, details: ["Request body could not be parsed."], fieldErrors: {} };
   }
 
   return validateFeedback(payload);
@@ -73,7 +98,7 @@ async function readFeedback(request: Request): Promise<ValidationResult> {
 
 function validateFeedback(payload: unknown): ValidationResult {
   if (!isRecord(payload)) {
-    return { ok: false, details: ["Payload must be an object."] };
+    return { ok: false, details: ["Payload must be an object."], fieldErrors: {} };
   }
 
   const type = readString(payload.type);
@@ -85,26 +110,26 @@ function validateFeedback(payload: unknown): ValidationResult {
   const turnstileToken =
     readOptionalString(payload.turnstileToken) || readOptionalString(payload["cf-turnstile-response"]);
   const consent = payload.consent === true || payload.consent === "true" || payload.consent === "on";
-  const details: string[] = [];
+  const issues: ValidationIssue[] = [];
 
   if (!isFeedbackType(type)) {
-    details.push("Type must be one of: bug, feature, question.");
+    issues.push({ field: "type", message: "Type must be one of: bug, feature, question." });
   }
   if (title.length < 3 || title.length > 120) {
-    details.push("Title must be between 3 and 120 characters.");
+    issues.push({ field: "title", message: "Title must be between 3 and 120 characters." });
   }
   if (message.length < 10 || message.length > 4000) {
-    details.push("Message must be between 10 and 4000 characters.");
+    issues.push({ field: "message", message: "Message must be between 10 and 4000 characters." });
   }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    details.push("Email must be valid when provided.");
+    issues.push({ field: "email", message: "Email must be valid when provided." });
   }
   if (!consent) {
-    details.push("Consent is required.");
+    issues.push({ field: "consent", message: "Consent is required." });
   }
 
-  if (details.length > 0 || !isFeedbackType(type)) {
-    return { ok: false, details };
+  if (issues.length > 0 || !isFeedbackType(type)) {
+    return validationError(issues);
   }
 
   return {
@@ -119,6 +144,20 @@ function validateFeedback(payload: unknown): ValidationResult {
       turnstileToken,
       company
     }
+  };
+}
+
+function validationError(issues: ValidationIssue[]): Extract<ValidationResult, { ok: false }> {
+  const fieldErrors: Partial<Record<FeedbackField, string[]>> = {};
+
+  for (const issue of issues) {
+    fieldErrors[issue.field] = [...(fieldErrors[issue.field] || []), issue.message];
+  }
+
+  return {
+    ok: false,
+    details: issues.map((issue) => issue.message),
+    fieldErrors
   };
 }
 

@@ -57,7 +57,7 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
           <p>Use fake data in this public demo. Real support repositories should be private.</p>
 
           <form id="feedback-form" method="post" action="/api/feedback" novalidate>
-            <div class="field">
+            <div class="field" data-field="type">
               <label for="type">Type</label>
               <select id="type" name="type" required>
                 <option value="bug">Bug report</option>
@@ -66,7 +66,7 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
               </select>
             </div>
 
-            <div class="field">
+            <div class="field" data-field="title">
               <label for="title">Title</label>
               <input
                 id="title"
@@ -78,7 +78,7 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
               />
             </div>
 
-            <div class="field">
+            <div class="field" data-field="message">
               <label for="message">Message</label>
               <textarea
                 id="message"
@@ -89,11 +89,11 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
             </div>
 
             <div class="grid">
-              <div class="field">
+              <div class="field" data-field="email">
                 <label for="email">Email <span class="label">(optional)</span></label>
                 <input id="email" name="email" type="email" autocomplete="email" placeholder="reader@example.com" />
               </div>
-              <div class="field">
+              <div class="field" data-field="environment">
                 <label for="environment">Environment <span class="label">(optional)</span></label>
                 <input id="environment" name="environment" type="text" placeholder="Safari 18, macOS 15" />
               </div>
@@ -104,12 +104,12 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
               <input id="company" name="company" type="text" tabindex="-1" autocomplete="off" />
             </div>
 
-            <label class="consent">
+            <label class="consent" data-field="consent">
               <input id="consent" name="consent" type="checkbox" required />
               <span>I understand this demo creates a public GitHub issue with the submitted text.</span>
             </label>
 
-            <div class="turnstile-field" aria-label="Spam protection">
+            <div class="turnstile-field" data-field="turnstileToken" aria-label="Spam protection">
               <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-theme="light"></div>
             </div>
 
@@ -117,7 +117,7 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
               <button type="submit" data-default-label="Create GitHub issue" data-loading-label="Creating issue...">
                 Create GitHub issue
               </button>
-              <p class="status" id="status" role="status" aria-live="polite"></p>
+              <div class="status" id="status" role="status" aria-live="polite"></div>
             </div>
           </form>
         </section>
@@ -132,9 +132,62 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
       const previewEnvironment = document.querySelector("#preview-env");
       const previewMessage = document.querySelector("#preview-message");
 
+      type FieldErrors = Record<string, string[]>;
+
       function resetTurnstile() {
         const turnstile = (window as Window & { turnstile?: { reset: () => void } }).turnstile;
         turnstile?.reset();
+      }
+
+      function clearFieldErrors() {
+        document.querySelectorAll("[data-field][data-invalid='true']").forEach((field) => {
+          field.removeAttribute("data-invalid");
+          field.querySelector(".field-error")?.remove();
+        });
+      }
+
+      function setFieldErrors(fieldErrors: FieldErrors) {
+        for (const [fieldName, messages] of Object.entries(fieldErrors)) {
+          const field = document.querySelector(`[data-field="${fieldName}"]`);
+          if (!(field instanceof HTMLElement) || messages.length === 0) {
+            continue;
+          }
+
+          field.dataset.invalid = "true";
+          field.querySelector(".field-error")?.remove();
+
+          const error = document.createElement("p");
+          error.className = "field-error";
+          error.textContent = messages[0];
+          field.append(error);
+        }
+      }
+
+      function showStatus(message: string, state: "success" | "error", details: string[] = []) {
+        if (!(status instanceof HTMLElement)) {
+          return;
+        }
+
+        status.replaceChildren();
+        status.dataset.state = state;
+
+        const title = document.createElement("p");
+        title.className = "status-title";
+        title.textContent = message;
+        status.append(title);
+
+        if (details.length > 0) {
+          const list = document.createElement("ul");
+          list.className = "status-list";
+
+          for (const detail of details) {
+            const item = document.createElement("li");
+            item.textContent = detail;
+            list.append(item);
+          }
+
+          status.append(list);
+        }
       }
 
       function updatePreview(formData: FormData) {
@@ -154,6 +207,11 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
 
       form?.addEventListener("input", () => {
         if (form instanceof HTMLFormElement) {
+          clearFieldErrors();
+          if (status instanceof HTMLElement) {
+            status.replaceChildren();
+            status.dataset.state = "";
+          }
           updatePreview(new FormData(form));
         }
       });
@@ -171,21 +229,32 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
         const message = String(formData.get("message") || "").trim();
         const consent = formData.get("consent") === "on";
         const turnstileToken = String(formData.get("cf-turnstile-response") || "").trim();
+        const clientFieldErrors: FieldErrors = {};
 
-        if (!title || !message || !consent) {
-          status.textContent = "Title, message, and consent are required.";
-          status.dataset.state = "error";
-          return;
+        clearFieldErrors();
+
+        if (!title) {
+          clientFieldErrors.title = ["Title is required."];
+        }
+        if (!message) {
+          clientFieldErrors.message = ["Message is required."];
+        }
+        if (!consent) {
+          clientFieldErrors.consent = ["Consent is required."];
+        }
+        if (!turnstileToken) {
+          clientFieldErrors.turnstileToken = ["Complete the Turnstile verification before submitting."];
         }
 
-        if (!turnstileToken) {
-          status.textContent = "Complete the Turnstile verification before submitting.";
-          status.dataset.state = "error";
+        if (Object.keys(clientFieldErrors).length > 0) {
+          const details = Object.values(clientFieldErrors).flat();
+          setFieldErrors(clientFieldErrors);
+          showStatus("Fix the highlighted fields.", "error", details);
           return;
         }
 
         updatePreview(formData);
-        status.textContent = "";
+        status.replaceChildren();
         status.dataset.state = "";
 
         if (submitButton instanceof HTMLButtonElement) {
@@ -211,14 +280,19 @@ const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey |
           const result = await response.json();
 
           if (!response.ok || !result.referenceId) {
-            throw new Error(result.error || "Feedback could not be submitted.");
+            const details = Array.isArray(result.details) ? result.details : [];
+            const fieldErrors = result.fieldErrors && typeof result.fieldErrors === "object" ? result.fieldErrors : {};
+
+            setFieldErrors(fieldErrors);
+            showStatus(result.error || "Feedback could not be submitted.", "error", details);
+            resetTurnstile();
+            return;
           }
 
-          status.textContent = `Created GitHub issue. Reference ID: ${result.referenceId}`;
-          status.dataset.state = "success";
+          clearFieldErrors();
+          showStatus(`Created GitHub issue. Reference ID: ${result.referenceId}`, "success");
         } catch (error) {
-          status.textContent = error instanceof Error ? error.message : "Feedback could not be submitted.";
-          status.dataset.state = "error";
+          showStatus(error instanceof Error ? error.message : "Feedback could not be submitted.", "error");
           resetTurnstile();
         } finally {
           if (submitButton instanceof HTMLButtonElement) {
