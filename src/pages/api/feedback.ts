@@ -163,7 +163,8 @@ function createReferenceId(): string {
 }
 
 function requiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
+  const metaEnv = import.meta.env as Record<string, string | undefined>;
+  const value = process.env[name]?.trim() || metaEnv[name]?.trim();
   if (!value) {
     throw new Error(`${name} is not configured.`);
   }
