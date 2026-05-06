@@ -175,6 +175,7 @@ function requiredEnv(name: string): string {
 function normalizePrivateKey(value: string): string {
   return value
     .replace(/^["']|["']$/g, "")
+    .replace(/\\\\n/g, "\n")
     .replace(/\\n/g, "\n");
 }
 
