@@ -1,0 +1,195 @@
+---
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Astro support form to GitHub Issues</title>
+    <meta
+      name="description"
+      content="A small Astro demo that sends website feedback to GitHub Issues through a GitHub App."
+    />
+  </head>
+  <body>
+    <main>
+      <div class="shell">
+        <section class="intro" aria-labelledby="page-title">
+          <h1 id="page-title">Turn website feedback into GitHub Issues</h1>
+          <p>
+            This Astro demo keeps the form on your site and moves support triage into the
+            repository where your team already plans, labels, and fixes work.
+          </p>
+          <div class="flow" aria-label="Submission flow">
+            <span><strong>1.</strong> Visitor submits the form</span>
+            <span><strong>2.</strong> Astro validates the payload on the server</span>
+            <span><strong>3.</strong> A GitHub App creates an issue in this repository</span>
+          </div>
+          <article class="issue-card" aria-labelledby="issue-preview-title">
+            <header>
+              <h2 id="issue-preview-title">GitHub issue preview</h2>
+              <code>labels: feedback</code>
+            </header>
+            <div class="issue-body">
+              <p class="issue-title" id="preview-title">[SUP-DEMO] Calendar export fails</p>
+              <div class="issue-meta">
+                <span id="preview-type">bug</span>
+                <span id="preview-env">Safari 18, macOS 15</span>
+              </div>
+              <p class="issue-message" id="preview-message">
+                The issue body includes the message, optional email, browser context, and a reference ID.
+              </p>
+            </div>
+          </article>
+        </section>
+
+        <section class="form-card" aria-labelledby="form-title">
+          <h2 id="form-title">Send feedback</h2>
+          <p>Use fake data in this public demo. Real support repositories should be private.</p>
+
+          <form id="feedback-form" method="post" action="/api/feedback" novalidate>
+            <div class="field">
+              <label for="type">Type</label>
+              <select id="type" name="type" required>
+                <option value="bug">Bug report</option>
+                <option value="feature">Feature request</option>
+                <option value="question">Question</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="title">Title</label>
+              <input id="title" name="title" type="text" maxlength="120" required value="Calendar export fails" />
+            </div>
+
+            <div class="field">
+              <label for="message">Message</label>
+              <textarea id="message" name="message" required>I clicked Export and the request returned a 500 response. I expected a downloadable ICS file.</textarea>
+            </div>
+
+            <div class="grid">
+              <div class="field">
+                <label for="email">Email <span class="label">(optional)</span></label>
+                <input id="email" name="email" type="email" autocomplete="email" placeholder="reader@example.com" />
+              </div>
+              <div class="field">
+                <label for="environment">Environment <span class="label">(optional)</span></label>
+                <input id="environment" name="environment" type="text" value="Safari 18, macOS 15" />
+              </div>
+            </div>
+
+            <div class="honeypot" aria-hidden="true">
+              <label for="company">Company</label>
+              <input id="company" name="company" type="text" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <label class="consent">
+              <input id="consent" name="consent" type="checkbox" required />
+              <span>I understand this demo creates a public GitHub issue with the submitted text.</span>
+            </label>
+
+            <div class="actions">
+              <button type="submit" data-default-label="Create GitHub issue" data-loading-label="Creating issue...">
+                Create GitHub issue
+              </button>
+              <p class="status" id="status" role="status" aria-live="polite"></p>
+            </div>
+          </form>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const form = document.querySelector("#feedback-form");
+      const status = document.querySelector("#status");
+      const previewTitle = document.querySelector("#preview-title");
+      const previewType = document.querySelector("#preview-type");
+      const previewEnvironment = document.querySelector("#preview-env");
+      const previewMessage = document.querySelector("#preview-message");
+
+      function updatePreview(formData: FormData) {
+        if (previewTitle) {
+          previewTitle.textContent = `[SUP-DEMO] ${formData.get("title") || "Untitled feedback"}`;
+        }
+        if (previewType) {
+          previewType.textContent = String(formData.get("type") || "feedback");
+        }
+        if (previewEnvironment) {
+          previewEnvironment.textContent = String(formData.get("environment") || "Environment not provided");
+        }
+        if (previewMessage) {
+          previewMessage.textContent = String(formData.get("message") || "Message preview will appear here.");
+        }
+      }
+
+      form?.addEventListener("input", () => {
+        if (form instanceof HTMLFormElement) {
+          updatePreview(new FormData(form));
+        }
+      });
+
+      form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!(form instanceof HTMLFormElement) || !(status instanceof HTMLElement)) {
+          return;
+        }
+
+        const submitButton = form.querySelector("button[type='submit']");
+        const formData = new FormData(form);
+        const title = String(formData.get("title") || "").trim();
+        const message = String(formData.get("message") || "").trim();
+        const consent = formData.get("consent") === "on";
+
+        if (!title || !message || !consent) {
+          status.textContent = "Title, message, and consent are required.";
+          status.dataset.state = "error";
+          return;
+        }
+
+        updatePreview(formData);
+        status.textContent = "";
+        status.dataset.state = "";
+
+        if (submitButton instanceof HTMLButtonElement) {
+          submitButton.disabled = true;
+          submitButton.textContent = submitButton.dataset.loadingLabel || "Creating issue...";
+        }
+
+        try {
+          const response = await fetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: formData.get("type"),
+              title,
+              message,
+              email: String(formData.get("email") || "").trim(),
+              environment: String(formData.get("environment") || "").trim(),
+              consent,
+              company: String(formData.get("company") || "")
+            })
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.referenceId) {
+            throw new Error(result.error || "Feedback could not be submitted.");
+          }
+
+          status.textContent = `Created GitHub issue. Reference ID: ${result.referenceId}`;
+          status.dataset.state = "success";
+        } catch (error) {
+          status.textContent = error instanceof Error ? error.message : "Feedback could not be submitted.";
+          status.dataset.state = "error";
+        } finally {
+          if (submitButton instanceof HTMLButtonElement) {
+            submitButton.disabled = false;
+            submitButton.textContent = submitButton.dataset.defaultLabel || "Create GitHub issue";
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
