@@ -1,5 +1,10 @@
 ---
+import { env as cloudflareEnv } from "cloudflare:workers";
 import "../styles/global.css";
+
+const runtimeEnv = cloudflareEnv as Record<string, string | undefined>;
+const nodeTurnstileSiteKey = typeof process !== "undefined" ? process.env.TURNSTILE_SITE_KEY : undefined;
+const turnstileSiteKey = runtimeEnv.TURNSTILE_SITE_KEY || nodeTurnstileSiteKey || "";
 ---
 
 <!doctype html>
@@ -13,6 +18,7 @@ import "../styles/global.css";
       name="description"
       content="A small Astro demo that sends website feedback to GitHub Issues through a GitHub App."
     />
+    <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
     <main>
@@ -91,6 +97,10 @@ import "../styles/global.css";
               <span>I understand this demo creates a public GitHub issue with the submitted text.</span>
             </label>
 
+            <div class="turnstile-field" aria-label="Spam protection">
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-theme="light"></div>
+            </div>
+
             <div class="actions">
               <button type="submit" data-default-label="Create GitHub issue" data-loading-label="Creating issue...">
                 Create GitHub issue
@@ -109,6 +119,11 @@ import "../styles/global.css";
       const previewType = document.querySelector("#preview-type");
       const previewEnvironment = document.querySelector("#preview-env");
       const previewMessage = document.querySelector("#preview-message");
+
+      function resetTurnstile() {
+        const turnstile = (window as Window & { turnstile?: { reset: () => void } }).turnstile;
+        turnstile?.reset();
+      }
 
       function updatePreview(formData: FormData) {
         if (previewTitle) {
@@ -143,9 +158,16 @@ import "../styles/global.css";
         const title = String(formData.get("title") || "").trim();
         const message = String(formData.get("message") || "").trim();
         const consent = formData.get("consent") === "on";
+        const turnstileToken = String(formData.get("cf-turnstile-response") || "").trim();
 
         if (!title || !message || !consent) {
           status.textContent = "Title, message, and consent are required.";
+          status.dataset.state = "error";
+          return;
+        }
+
+        if (!turnstileToken) {
+          status.textContent = "Complete the Turnstile verification before submitting.";
           status.dataset.state = "error";
           return;
         }
@@ -170,6 +192,7 @@ import "../styles/global.css";
               email: String(formData.get("email") || "").trim(),
               environment: String(formData.get("environment") || "").trim(),
               consent,
+              turnstileToken,
               company: String(formData.get("company") || "")
             })
           });
@@ -184,6 +207,7 @@ import "../styles/global.css";
         } catch (error) {
           status.textContent = error instanceof Error ? error.message : "Feedback could not be submitted.";
           status.dataset.state = "error";
+          resetTurnstile();
         } finally {
           if (submitButton instanceof HTMLButtonElement) {
             submitButton.disabled = false;

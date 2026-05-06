@@ -11,6 +11,7 @@ type FeedbackInput = {
   email?: string;
   environment?: string;
   consent: boolean;
+  turnstileToken?: string;
   company?: string;
 };
 
@@ -37,6 +38,11 @@ export const POST: APIRoute = async ({ request }) => {
 
   if (validation.input.company?.trim()) {
     return json({ ok: true, referenceId });
+  }
+
+  const turnstile = await verifyTurnstile(validation.input.turnstileToken, request);
+  if (!turnstile.ok) {
+    return json({ ok: false, error: "Turnstile verification failed" }, 400);
   }
 
   try {
@@ -76,6 +82,8 @@ function validateFeedback(payload: unknown): ValidationResult {
   const email = readOptionalString(payload.email);
   const environment = readOptionalString(payload.environment);
   const company = readOptionalString(payload.company);
+  const turnstileToken =
+    readOptionalString(payload.turnstileToken) || readOptionalString(payload["cf-turnstile-response"]);
   const consent = payload.consent === true || payload.consent === "true" || payload.consent === "on";
   const details: string[] = [];
 
@@ -108,9 +116,50 @@ function validateFeedback(payload: unknown): ValidationResult {
       email,
       environment,
       consent,
+      turnstileToken,
       company
     }
   };
+}
+
+async function verifyTurnstile(
+  token: string | undefined,
+  request: Request
+): Promise<{ ok: true } | { ok: false }> {
+  if (!token) {
+    return { ok: false };
+  }
+
+  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      secret: requiredEnv("TURNSTILE_SECRET_KEY"),
+      response: token,
+      remoteip: getClientIp(request),
+      idempotency_key: crypto.randomUUID()
+    })
+  });
+
+  if (!response.ok) {
+    return { ok: false };
+  }
+
+  const result = (await response.json()) as { success?: boolean; "error-codes"?: string[] };
+  if (!result.success) {
+    console.warn("Turnstile verification failed", result["error-codes"] || []);
+    return { ok: false };
+  }
+
+  return { ok: true };
+}
+
+function getClientIp(request: Request): string | undefined {
+  const cloudflareIp = request.headers.get("CF-Connecting-IP")?.trim();
+  const forwardedIp = request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim();
+  return cloudflareIp || forwardedIp || undefined;
 }
 
 async function createIssue(input: FeedbackInput, referenceId: string): Promise<void> {
@@ -194,6 +243,7 @@ function formDataToObject(formData: FormData): Record<string, unknown> {
     email: formData.get("email"),
     environment: formData.get("environment"),
     consent: formData.get("consent"),
+    turnstileToken: formData.get("cf-turnstile-response"),
     company: formData.get("company")
   };
 }

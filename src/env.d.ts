@@ -4,5 +4,7 @@ declare module "cloudflare:workers" {
     GITHUB_PRIVATE_KEY?: string;
     GITHUB_OWNER?: string;
     GITHUB_REPO?: string;
+    TURNSTILE_SITE_KEY?: string;
+    TURNSTILE_SECRET_KEY?: string;
   };
 }
